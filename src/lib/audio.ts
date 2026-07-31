@@ -1,9 +1,13 @@
-// WebAudio sound engine: chiptune blips plus a real recorded elephant trumpet.
+// WebAudio sound engine: chiptune blips plus real recorded samples (elephant
+// trumpet, running rumble).
 import trumpetUrl from "@/assets/elephant-trumpet.mp3";
+import rumbleUrl from "@/assets/rumbling.mp3";
 
 let ctx: AudioContext | null = null;
 let trumpetBuffer: AudioBuffer | null = null;
 let trumpetLoad: Promise<AudioBuffer | null> | null = null;
+let rumbleSampleBuffer: AudioBuffer | null = null;
+let rumbleSampleLoad: Promise<AudioBuffer | null> | null = null;
 
 /** Fetch + decode the elephant sample once, cached for later plays. */
 function loadTrumpet(): Promise<AudioBuffer | null> {
@@ -19,6 +23,22 @@ function loadTrumpet(): Promise<AudioBuffer | null> {
       .catch(() => null);
   }
   return trumpetLoad;
+}
+
+/** Fetch + decode the running-rumble sample once, cached for later plays. */
+function loadRumbleSample(): Promise<AudioBuffer | null> {
+  if (rumbleSampleBuffer) return Promise.resolve(rumbleSampleBuffer);
+  if (!rumbleSampleLoad) {
+    rumbleSampleLoad = fetch(rumbleUrl)
+      .then((res) => res.arrayBuffer())
+      .then((buf) => ac().decodeAudioData(buf))
+      .then((decoded) => {
+        rumbleSampleBuffer = decoded;
+        return decoded;
+      })
+      .catch(() => null);
+  }
+  return rumbleSampleLoad;
 }
 
 function ac(): AudioContext {
@@ -174,17 +194,21 @@ export function playWink() {
   tone(950, 0.05, 0.06, "square", 0.08);
 }
 
-let rumble: {
-  oscA: OscillatorNode;
-  oscB: OscillatorNode;
-  lfo: OscillatorNode;
-  gain: GainNode;
-} | null = null;
+type RumbleNodes =
+  | { kind: "sample"; src: AudioBufferSourceNode; gain: GainNode }
+  | {
+      kind: "synth";
+      oscA: OscillatorNode;
+      oscB: OscillatorNode;
+      lfo: OscillatorNode;
+      gain: GainNode;
+    };
 
-/** Low charging-bull drone, held for the duration of a run. */
-export function startRumble() {
-  if (rumble) return;
-  const a = ac();
+let rumble: RumbleNodes | null = null;
+let rumbleActive = false;
+
+/** Fallback synth drone if the recorded rumble sample can't load. */
+function startSynthRumble(a: AudioContext) {
   const oscA = a.createOscillator();
   const oscB = a.createOscillator();
   const lfo = a.createOscillator();
@@ -213,19 +237,46 @@ export function startRumble() {
   oscB.start(t);
   lfo.start(t);
 
-  rumble = { oscA, oscB, lfo, gain };
+  rumble = { kind: "synth", oscA, oscB, lfo, gain };
+}
+
+/** Recorded running rumble, looped for the duration of a run. */
+export function startRumble() {
+  if (rumbleActive) return;
+  rumbleActive = true;
+  const a = ac();
+  void loadRumbleSample().then((buffer) => {
+    if (!rumbleActive) return; // stopRumble() already ran before this resolved
+    if (!buffer) return startSynthRumble(a);
+    const src = a.createBufferSource();
+    const gain = a.createGain();
+    src.buffer = buffer;
+    src.loop = true;
+    src.playbackRate.value = 0.95 + Math.random() * 0.1;
+    gain.gain.setValueAtTime(0.0001, a.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.9, a.currentTime + 0.2);
+    src.connect(gain).connect(a.destination);
+    src.start();
+    rumble = { kind: "sample", src, gain };
+  });
 }
 
 export function stopRumble() {
-  if (!rumble) return;
-  const { oscA, oscB, lfo, gain } = rumble;
+  if (!rumbleActive) return;
+  rumbleActive = false;
+  if (!rumble) return; // hadn't finished loading yet; the .then above will bail out
+  const { gain } = rumble;
   const a = ac();
   const t = a.currentTime;
   gain.gain.cancelScheduledValues(t);
   gain.gain.setValueAtTime(gain.gain.value, t);
   gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
-  oscA.stop(t + 0.2);
-  oscB.stop(t + 0.2);
-  lfo.stop(t + 0.2);
+  if (rumble.kind === "sample") {
+    rumble.src.stop(t + 0.2);
+  } else {
+    rumble.oscA.stop(t + 0.2);
+    rumble.oscB.stop(t + 0.2);
+    rumble.lfo.stop(t + 0.2);
+  }
   rumble = null;
 }
