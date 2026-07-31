@@ -157,3 +157,9 @@ export function playRimshot() {
 export function playBlip(seed: number) {
   tone(420 + (seed % 5) * 60, 0, 0.045, "square", 0.045);
 }
+
+/** Cute little chirp for a wink. */
+export function playWink() {
+  tone(700, 0, 0.05, "square", 0.08);
+  tone(950, 0.05, 0.06, "square", 0.08);
+}
