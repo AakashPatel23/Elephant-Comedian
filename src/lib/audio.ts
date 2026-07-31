@@ -1,13 +1,16 @@
 // WebAudio sound engine: chiptune blips plus real recorded samples (elephant
-// trumpet, running rumble).
+// trumpet, running rumble, the "imagenius" easter-egg clip).
 import trumpetUrl from "@/assets/elephant-trumpet.mp3";
 import rumbleUrl from "@/assets/rumbling.mp3";
+import imageniusUrl from "@/assets/imagenius.mp3";
 
 let ctx: AudioContext | null = null;
 let trumpetBuffer: AudioBuffer | null = null;
 let trumpetLoad: Promise<AudioBuffer | null> | null = null;
 let rumbleSampleBuffer: AudioBuffer | null = null;
 let rumbleSampleLoad: Promise<AudioBuffer | null> | null = null;
+let imageniusBuffer: AudioBuffer | null = null;
+let imageniusLoad: Promise<AudioBuffer | null> | null = null;
 
 /** Fetch + decode the elephant sample once, cached for later plays. */
 function loadTrumpet(): Promise<AudioBuffer | null> {
@@ -39,6 +42,22 @@ function loadRumbleSample(): Promise<AudioBuffer | null> {
       .catch(() => null);
   }
   return rumbleSampleLoad;
+}
+
+/** Fetch + decode the "imagenius" easter-egg sample once, cached for later plays. */
+function loadImagenius(): Promise<AudioBuffer | null> {
+  if (imageniusBuffer) return Promise.resolve(imageniusBuffer);
+  if (!imageniusLoad) {
+    imageniusLoad = fetch(imageniusUrl)
+      .then((res) => res.arrayBuffer())
+      .then((buf) => ac().decodeAudioData(buf))
+      .then((decoded) => {
+        imageniusBuffer = decoded;
+        return decoded;
+      })
+      .catch(() => null);
+  }
+  return imageniusLoad;
 }
 
 function ac(): AudioContext {
@@ -188,10 +207,21 @@ export function playBlip(seed: number) {
   tone(420 + (seed % 5) * 60, 0, 0.045, "square", 0.045);
 }
 
-/** Cute little chirp for a wink. */
-export function playWink() {
-  tone(700, 0, 0.05, "square", 0.08);
-  tone(950, 0.05, 0.06, "square", 0.08);
+/** The secret "imagenius" easter-egg clip. Resolves once playback finishes. */
+export function playImagenius(): Promise<void> {
+  const a = ac();
+  return loadImagenius().then((buffer) => {
+    if (!buffer) return;
+    return new Promise<void>((resolve) => {
+      const src = a.createBufferSource();
+      const g = a.createGain();
+      src.buffer = buffer;
+      g.gain.value = 0.9;
+      src.connect(g).connect(a.destination);
+      src.onended = () => resolve();
+      src.start();
+    });
+  });
 }
 
 type RumbleNodes =

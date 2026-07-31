@@ -4,8 +4,8 @@
 //  - elephant-poses.png: 3 frames authored to match (sit, and a 2-frame climb scrabble)
 //    since the walk sheet didn't cover those.
 // The head never moves across any frame in either sheet, so eyes can be closed for a
-// blink/wink/dazed look by painting two small rects over the eye pixels at a fixed
-// spot, regardless of which frame is currently showing.
+// blink/dazed look by painting two small rects over the eye pixels at a fixed spot,
+// regardless of which frame is currently showing.
 import walkSheetUrl from "@/assets/elephant-walk.png";
 import posesSheetUrl from "@/assets/elephant-poses.png";
 
@@ -42,7 +42,7 @@ export const POSE_SIT = 0;
 export const POSE_CLIMB_A = 1;
 export const POSE_CLIMB_B = 2;
 
-export type EyeState = "open" | "blink" | "wink-left" | "wink-right";
+export type EyeState = "open" | "blink";
 
 const EYE_LEFT_X = 20;
 const EYE_RIGHT_X = 26;
@@ -95,10 +95,6 @@ export function drawElephant(
   );
   if (eyeState === "blink") {
     closeEye(ctx, EYE_LEFT_X);
-    closeEye(ctx, EYE_RIGHT_X);
-  } else if (eyeState === "wink-left") {
-    closeEye(ctx, EYE_LEFT_X);
-  } else if (eyeState === "wink-right") {
     closeEye(ctx, EYE_RIGHT_X);
   }
   ctx.restore();

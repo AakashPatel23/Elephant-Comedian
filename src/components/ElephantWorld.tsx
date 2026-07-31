@@ -13,17 +13,18 @@ import {
   playBlip,
   playBonk,
   playClimbFail,
+  playImagenius,
   playJokeJingle,
   playRimshot,
   playSit,
   playThump,
   playTrumpet,
-  playWink,
   startRumble,
   stopRumble,
 } from "@/lib/audio";
 import { NameTag } from "./NameTag";
 import { Scenery } from "./Scenery";
+import { SecretButton } from "./SecretButton";
 import { SpeechBubble } from "./SpeechBubble";
 
 const SCALE = 6;
@@ -47,10 +48,13 @@ const CLIMB_HEIGHT = 90;
 const TRUMPET_FRAME_DURATION = 0.06;
 const TRUMPET_DURATION = TRUMPET_FRAMES.length * TRUMPET_FRAME_DURATION + 0.7;
 const DAZED_DURATION = 2.4;
-const WINK_HOLD = 0.7;
 const BLINK_HOLD = 0.14;
 const THUMP_MIN_GAP = 7;
 const THUMP_MAX_GAP = 16;
+// Easter-egg sequence: trunk up, a long suspenseful blink, the secret clip, then a
+// celebratory run.
+const SPECIAL_BLINK_HOLD = 1.8;
+const SPECIAL_RUN_DURATION = 4.5;
 
 type Mode = "walk" | "run" | "sit" | "climb" | "dazed" | "trumpet" | "joke";
 
@@ -66,8 +70,6 @@ type Engine = {
   trumpetElapsed: number;
   blinkCooldown: number; // seconds until next blink
   blinkHold: number; // seconds left with eyes shut
-  winkSide: "left" | "right";
-  winkHold: number; // seconds left winking
   thumpCooldown: number; // seconds until next ambient footstep thump
 };
 
@@ -105,8 +107,6 @@ export function ElephantWorld() {
     trumpetElapsed: 0,
     blinkCooldown: 2 + Math.random() * 3,
     blinkHold: 0,
-    winkSide: "left",
-    winkHold: 0,
     thumpCooldown: THUMP_MIN_GAP + Math.random() * (THUMP_MAX_GAP - THUMP_MIN_GAP),
   });
 
@@ -210,6 +210,8 @@ export function ElephantWorld() {
   );
 
   // ---- click interaction ---------------------------------------------
+  // Poking the elephant no longer starts a joke (that's the "Joke me!" button's job) -
+  // it only reveals a pending punchline, or otherwise triggers sit/run/trumpet.
   const onPoke = useCallback(() => {
     const e = engine.current;
 
@@ -222,25 +224,41 @@ export function ElephantWorld() {
 
     if (e.mode === "dazed" || e.mode === "climb" || e.mode === "joke" || jokeLoading) return;
 
-    // jokes are the star of the show, so they come up much more often than the rest
-    if (Math.random() < 0.55) {
-      doJoke();
-      return;
-    }
-    const roll = Math.floor(Math.random() * 4);
+    const roll = Math.floor(Math.random() * 3);
     if (roll === 0) {
       doSit();
     } else if (roll === 1) {
       setMode("run", 1.5 + Math.random() * 2);
-    } else if (roll === 2) {
+    } else {
       setMode("trumpet", TRUMPET_DURATION);
       playTrumpet();
-    } else {
-      e.winkSide = Math.random() < 0.5 ? "left" : "right";
-      e.winkHold = WINK_HOLD;
-      playWink();
     }
-  }, [doJoke, doSit, jokeLoading, revealPunchline, setMode]);
+  }, [doSit, jokeLoading, revealPunchline, setMode]);
+
+  const onJokeButtonClick = useCallback(() => {
+    const e = engine.current;
+    if (e.mode === "dazed" || e.mode === "climb" || jokeLoading) return;
+    doJoke();
+  }, [doJoke, jokeLoading]);
+
+  // ---- secret easter egg -----------------------------------------------
+  const triggerSpecial = useCallback(() => {
+    const e = engine.current;
+    // interrupt any joke in progress so the sequence doesn't collide with it
+    pendingPunchline.current = null;
+    setJoke(null);
+    setJokeLoading(false);
+
+    setMode("trumpet", TRUMPET_DURATION);
+    window.setTimeout(() => {
+      e.blinkHold = SPECIAL_BLINK_HOLD;
+      window.setTimeout(() => {
+        void playImagenius().then(() => {
+          setMode("run", SPECIAL_RUN_DURATION);
+        });
+      }, SPECIAL_BLINK_HOLD * 1000);
+    }, TRUMPET_DURATION * 1000);
+  }, [setMode]);
 
   // ---- main loop -------------------------------------------------------
   useEffect(() => {
@@ -256,10 +274,8 @@ export function ElephantWorld() {
       const e = engine.current;
       const maxX = Math.max(60, window.innerWidth - SPRITE_W);
 
-      // ---- blink / wink timers (run in every mode) ----
-      if (e.winkHold > 0) {
-        e.winkHold = Math.max(0, e.winkHold - dt);
-      } else if (e.blinkHold > 0) {
+      // ---- blink timer (runs in every mode) ----
+      if (e.blinkHold > 0) {
         e.blinkHold -= dt;
         if (e.blinkHold <= 0) e.blinkCooldown = 2 + Math.random() * 3;
       } else {
@@ -333,16 +349,7 @@ export function ElephantWorld() {
         bodyRef.current.style.transform = `translate3d(${e.x}px, ${-e.y}px, 0)`;
       }
 
-      const eyeState: EyeState =
-        e.mode === "dazed"
-          ? "blink"
-          : e.winkHold > 0
-            ? e.winkSide === "left"
-              ? "wink-left"
-              : "wink-right"
-            : e.blinkHold > 0
-              ? "blink"
-              : "open";
+      const eyeState: EyeState = e.mode === "dazed" || e.blinkHold > 0 ? "blink" : "open";
 
       const flip = e.dir === -1;
       if (e.mode === "climb") {
@@ -394,14 +401,28 @@ export function ElephantWorld() {
     >
       <Scenery />
 
+      <SecretButton onUnlock={triggerSpecial} />
+
       <header className="relative z-10 px-6 pt-8 text-center">
         <h1 className="font-pixel text-lg text-foreground sm:text-2xl">
           Elephant Comedian Playpen
         </h1>
         <p className="mt-3 font-pixel text-[9px] leading-5 text-foreground/70 sm:text-[10px]">
-          click {name} to poke · click the tag to rename
+          click {name} to poke · Joke me! for a joke, then click {name} for the punchline · click
+          the tag to rename
         </p>
       </header>
+
+      <div className="relative z-10 mt-6 flex justify-center">
+        <button
+          type="button"
+          onClick={onJokeButtonClick}
+          disabled={jokeLoading}
+          className="rounded-md border-2 border-foreground bg-card px-4 py-2 font-pixel text-[10px] text-card-foreground shadow-[3px_3px_0_0_var(--color-foreground)] transition-transform hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50"
+        >
+          Joke me!
+        </button>
+      </div>
 
       <div
         ref={bodyRef}
