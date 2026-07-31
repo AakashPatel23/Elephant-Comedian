@@ -1,5 +1,5 @@
 // WebAudio sound engine: chiptune blips plus a real recorded elephant trumpet.
-import trumpetAsset from "@/assets/elephant-trumpet.mp3.asset.json";
+import trumpetUrl from "@/assets/elephant-trumpet.mp3";
 
 let ctx: AudioContext | null = null;
 let trumpetBuffer: AudioBuffer | null = null;
@@ -9,7 +9,7 @@ let trumpetLoad: Promise<AudioBuffer | null> | null = null;
 function loadTrumpet(): Promise<AudioBuffer | null> {
   if (trumpetBuffer) return Promise.resolve(trumpetBuffer);
   if (!trumpetLoad) {
-    trumpetLoad = fetch(trumpetAsset.url)
+    trumpetLoad = fetch(trumpetUrl)
       .then((res) => res.arrayBuffer())
       .then((buf) => ac().decodeAudioData(buf))
       .then((decoded) => {

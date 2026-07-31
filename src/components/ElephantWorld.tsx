@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { FRAMES, GRID_H, GRID_W, drawFrame, type FrameName } from "@/lib/sprite";
 import {
   playBlip,
@@ -11,7 +10,6 @@ import {
   playStep,
   playTrumpet,
 } from "@/lib/audio";
-import { tellJoke } from "@/lib/jokes.functions";
 import { NameTag } from "./NameTag";
 import { SpeechBubble } from "./SpeechBubble";
 import { TrainingPanel } from "./TrainingPanel";
@@ -22,6 +20,16 @@ const SPRITE_H = GRID_H * SCALE;
 const WALK_SPEED = 55;
 const RUN_SPEED = 190;
 const GROUND_OFFSET = 96; // px above the bottom of the viewport
+
+// TODO: swap back to the tellJoke server fn (src/lib/jokes.functions.ts) once AI training is wired up.
+const PLACEHOLDER_JOKES = [
+  "WHY DON'T ELEPHANTS USE COMPUTERS? THEY'RE AFRAID OF THE MOUSE!",
+  "WHAT DO YOU CALL AN ELEPHANT THAT DOESN'T MATTER? AN IRRELEPHANT.",
+  "WHY DID THE ELEPHANT PAINT ITS TOENAILS RED? SO IT COULD HIDE IN A CHERRY TREE.",
+  "WHAT TIME IS IT WHEN AN ELEPHANT SITS ON YOUR FENCE? TIME TO GET A NEW FENCE.",
+  "HOW DO YOU KNOW IF THERE'S AN ELEPHANT IN YOUR FRIDGE? THE DOOR WON'T CLOSE.",
+  "WHY DID THE ELEPHANT CROSS THE ROAD? THE CHICKEN NEEDED THE DAY OFF.",
+];
 
 type Mode = "idle" | "walk" | "run" | "sit" | "climb" | "dazed" | "joke";
 
@@ -58,7 +66,6 @@ export function ElephantWorld() {
   const [name, setName] = useState("Pixel");
   const [style, setStyle] = useState("");
   const recentJokes = useRef<string[]>([]);
-  const askJoke = useServerFn(tellJoke);
 
   // ---- persistence -------------------------------------------------
   useEffect(() => {
@@ -112,33 +119,23 @@ export function ElephantWorld() {
     }, 38);
   }, []);
 
-  const doJoke = useCallback(async () => {
+  const doJoke = useCallback(() => {
     if (jokeLoading) return;
     setMode("idle", 1);
     setJokeLoading(true);
     setJoke("...");
     playJokeJingle();
-    try {
-      const res = await askJoke({
-        data: { style, name, recent: recentJokes.current.slice(-6) },
-      });
-      recentJokes.current.push(res.joke);
-      setMode("joke", Math.max(5, res.joke.length * 0.06 + 3));
-      typeOut(res.joke);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "";
-      setMode("joke", 5);
-      setJoke(
-        msg.includes("RATE_LIMIT")
-          ? "TOO MANY JOKES! LET MY TRUNK REST A SEC."
-          : msg.includes("NO_CREDITS")
-            ? "OUT OF AI CREDITS... ADD SOME AND I'LL BE HILARIOUS."
-            : "MY JOKE BOOK FELL IN THE MUD. TRY AGAIN!",
-      );
-    } finally {
+
+    window.setTimeout(() => {
+      const last = recentJokes.current[recentJokes.current.length - 1];
+      const options = PLACEHOLDER_JOKES.filter((j) => j !== last);
+      const joke = options[Math.floor(Math.random() * options.length)];
+      recentJokes.current.push(joke);
+      setMode("joke", Math.max(5, joke.length * 0.06 + 3));
+      typeOut(joke);
       setJokeLoading(false);
-    }
-  }, [askJoke, jokeLoading, name, setMode, style, typeOut]);
+    }, 500);
+  }, [jokeLoading, setMode, typeOut]);
 
   // ---- click interaction ---------------------------------------------
   const onPoke = useCallback(() => {

@@ -1,29 +1,30 @@
-# Welcome to your Lovable project
+# Pixel Elephant Playpen
 
-This project was built with [Lovable](https://lovable.dev).
+An animated 8-bit elephant that walks, trumpets, sits, and bonks into the edges of the screen.
+Click it to poke it, click its name tag to rename it, and hit "tell joke" to have it crack an
+elephant pun.
 
-## Build with Lovable
+## Tech stack
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+- TanStack Start
+- React
+- TypeScript
+- Tailwind CSS
 
 ## Development
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Requires [Bun](https://bun.sh).
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+bun install
+bun run dev
 ```
 
-## Built with
+## Scripts
 
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
+- `bun run dev` – start the dev server
+- `bun run build` – production build
+- `bun run build:dev` – build in development mode
+- `bun run preview` – preview a production build
+- `bun run lint` – run eslint
+- `bun run format` – run prettier
