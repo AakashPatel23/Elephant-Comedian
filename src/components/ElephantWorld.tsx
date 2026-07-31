@@ -55,6 +55,10 @@ const THUMP_MAX_GAP = 16;
 // celebratory run.
 const SPECIAL_BLINK_HOLD = 1.8;
 const SPECIAL_RUN_DURATION = 4.5;
+// The trunk-up pose must hold through the blink + the whole clip, well past the normal
+// trumpet mode's own timeout; this is just a generous safety cap in case the clip's
+// "ended" event never fires, so the elephant can't get stuck mid-pose forever.
+const SPECIAL_HOLD_MAX = 30;
 
 type Mode = "walk" | "run" | "sit" | "climb" | "dazed" | "trumpet" | "joke";
 
@@ -249,7 +253,11 @@ export function ElephantWorld() {
     setJoke(null);
     setJokeLoading(false);
 
-    setMode("trumpet", TRUMPET_DURATION);
+    // The trumpet draw call clamps to its last frame once trumpetElapsed runs past the
+    // animation, so holding "trumpet" mode here just holds the trunk fully raised -
+    // give it a long timer so the tick's own timeout doesn't put it down early, and
+    // transition out manually once the clip actually finishes.
+    setMode("trumpet", SPECIAL_HOLD_MAX);
     window.setTimeout(() => {
       e.blinkHold = SPECIAL_BLINK_HOLD;
       window.setTimeout(() => {
