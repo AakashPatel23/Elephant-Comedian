@@ -21,7 +21,6 @@ function loadTrumpet(): Promise<AudioBuffer | null> {
   return trumpetLoad;
 }
 
-
 function ac(): AudioContext {
   if (!ctx) {
     const Ctor =
@@ -95,7 +94,6 @@ function synthTrumpet() {
   osc.stop(t + 0.8);
   lfo.stop(t + 0.8);
 }
-
 
 /** Heavy thud + shake cue when it sits. */
 export function playSit() {
@@ -174,4 +172,60 @@ export function playBlip(seed: number) {
 export function playWink() {
   tone(700, 0, 0.05, "square", 0.08);
   tone(950, 0.05, 0.06, "square", 0.08);
+}
+
+let rumble: {
+  oscA: OscillatorNode;
+  oscB: OscillatorNode;
+  lfo: OscillatorNode;
+  gain: GainNode;
+} | null = null;
+
+/** Low charging-bull drone, held for the duration of a run. */
+export function startRumble() {
+  if (rumble) return;
+  const a = ac();
+  const oscA = a.createOscillator();
+  const oscB = a.createOscillator();
+  const lfo = a.createOscillator();
+  const lfoGain = a.createGain();
+  const gain = a.createGain();
+  const t = a.currentTime;
+
+  oscA.type = "sawtooth";
+  oscA.frequency.value = 48;
+  oscB.type = "sawtooth";
+  oscB.frequency.value = 51; // slight detune for a thicker, dirtier rumble
+
+  // tremolo the gain to give the drone a galloping, uneven texture
+  lfo.type = "sine";
+  lfo.frequency.value = 11;
+  lfoGain.gain.value = 0.08;
+  lfo.connect(lfoGain).connect(gain.gain);
+
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.22, t + 0.2);
+
+  oscA.connect(gain);
+  oscB.connect(gain);
+  gain.connect(a.destination);
+  oscA.start(t);
+  oscB.start(t);
+  lfo.start(t);
+
+  rumble = { oscA, oscB, lfo, gain };
+}
+
+export function stopRumble() {
+  if (!rumble) return;
+  const { oscA, oscB, lfo, gain } = rumble;
+  const a = ac();
+  const t = a.currentTime;
+  gain.gain.cancelScheduledValues(t);
+  gain.gain.setValueAtTime(gain.gain.value, t);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+  oscA.stop(t + 0.2);
+  oscB.stop(t + 0.2);
+  lfo.stop(t + 0.2);
+  rumble = null;
 }

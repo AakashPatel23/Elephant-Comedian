@@ -19,6 +19,8 @@ import {
   playThump,
   playTrumpet,
   playWink,
+  startRumble,
+  stopRumble,
 } from "@/lib/audio";
 import { NameTag } from "./NameTag";
 import { Scenery } from "./Scenery";
@@ -34,8 +36,11 @@ const RUN_SPEED = 130;
 // the feet visually planted instead of floating above the grass.
 const GROUND_OFFSET = 60; // px above the bottom of the viewport
 
-const WALK_FRAME_DURATION = 0.25;
-const RUN_FRAME_DURATION = 0.13;
+// Walk-cycle progress is paced by distance traveled (px per animation frame) rather
+// than elapsed time, so the legs always advance in lockstep with how far the body has
+// actually moved instead of drifting out of sync with it.
+const WALK_STRIDE_PX = 5;
+const RUN_STRIDE_PX = 10;
 const CLIMB_FRAME_DURATION = 0.12;
 const CLIMB_DURATION = 1.4;
 const CLIMB_HEIGHT = 90;
@@ -109,8 +114,11 @@ export function ElephantWorld() {
   const [dazed, setDazed] = useState(false);
   const [joke, setJoke] = useState<string | null>(null);
   const [jokeLoading, setJokeLoading] = useState(false);
-  const [name, setName] = useState("Pixel");
+  const [name, setName] = useState("Peanut");
   const recentJokes = useRef<(typeof PLACEHOLDER_JOKES)[number][]>([]);
+  // Set once the setup has finished typing; a poke while this is set reveals the
+  // punchline instead of rolling a new random reaction.
+  const pendingPunchline = useRef<(typeof PLACEHOLDER_JOKES)[number] | null>(null);
 
   // ---- persistence -------------------------------------------------
   useEffect(() => {
@@ -119,7 +127,7 @@ export function ElephantWorld() {
   }, []);
 
   const saveName = useCallback((next: string) => {
-    const clean = next.trim().slice(0, 20) || "Pixel";
+    const clean = next.trim().slice(0, 20) || "Peanut";
     setName(clean);
     localStorage.setItem("elephant.name", clean);
   }, []);
@@ -132,6 +140,8 @@ export function ElephantWorld() {
 
   const setMode = useCallback((mode: Mode, timer: number) => {
     const e = engine.current;
+    if (mode === "run" && e.mode !== "run") startRumble();
+    if (mode !== "run" && e.mode === "run") stopRumble();
     e.mode = mode;
     e.timer = timer;
     if (mode === "climb") {
@@ -176,29 +186,48 @@ export function ElephantWorld() {
     const pick = options[Math.floor(Math.random() * options.length)];
     recentJokes.current.push(pick);
 
-    // wait a beat before the setup appears, then a longer beat before the punchline lands
+    // wait a beat before the setup appears, then wait for a poke to reveal the punchline
     window.setTimeout(() => {
       typeOut("", pick.setup, () => {
-        window.setTimeout(() => {
-          typeOut(`${pick.setup} `, pick.punchline, () => {
-            window.setTimeout(playRimshot, 150);
-            window.setTimeout(() => {
-              setJoke(null);
-              setJokeLoading(false);
-              setMode("walk", 2 + Math.random() * 3);
-            }, 2400);
-          });
-        }, 1700);
+        pendingPunchline.current = pick;
+        setJoke((prev) => `${prev ?? ""} ▸`);
       });
     }, 400);
-  }, [jokeLoading, setMode, typeOut]);
+  }, [jokeLoading, typeOut]);
+
+  const revealPunchline = useCallback(
+    (pick: (typeof PLACEHOLDER_JOKES)[number]) => {
+      typeOut(`${pick.setup} `, pick.punchline, () => {
+        window.setTimeout(playRimshot, 150);
+        window.setTimeout(() => {
+          setJoke(null);
+          setJokeLoading(false);
+          setMode("walk", 2 + Math.random() * 3);
+        }, 2400);
+      });
+    },
+    [setMode, typeOut],
+  );
 
   // ---- click interaction ---------------------------------------------
   const onPoke = useCallback(() => {
     const e = engine.current;
+
+    if (pendingPunchline.current) {
+      const pick = pendingPunchline.current;
+      pendingPunchline.current = null;
+      revealPunchline(pick);
+      return;
+    }
+
     if (e.mode === "dazed" || e.mode === "climb" || e.mode === "joke" || jokeLoading) return;
 
-    const roll = Math.floor(Math.random() * 5);
+    // jokes are the star of the show, so they come up much more often than the rest
+    if (Math.random() < 0.55) {
+      doJoke();
+      return;
+    }
+    const roll = Math.floor(Math.random() * 4);
     if (roll === 0) {
       doSit();
     } else if (roll === 1) {
@@ -206,14 +235,12 @@ export function ElephantWorld() {
     } else if (roll === 2) {
       setMode("trumpet", TRUMPET_DURATION);
       playTrumpet();
-    } else if (roll === 3) {
+    } else {
       e.winkSide = Math.random() < 0.5 ? "left" : "right";
       e.winkHold = WINK_HOLD;
       playWink();
-    } else {
-      doJoke();
     }
-  }, [doJoke, doSit, jokeLoading, setMode]);
+  }, [doJoke, doSit, jokeLoading, revealPunchline, setMode]);
 
   // ---- main loop -------------------------------------------------------
   useEffect(() => {
@@ -242,9 +269,9 @@ export function ElephantWorld() {
 
       if (e.mode === "walk" || e.mode === "run") {
         const speed = e.mode === "run" ? RUN_SPEED : WALK_SPEED;
-        const frameDuration = e.mode === "run" ? RUN_FRAME_DURATION : WALK_FRAME_DURATION;
+        const stridePx = e.mode === "run" ? RUN_STRIDE_PX : WALK_STRIDE_PX;
         e.x += e.dir * speed * dt;
-        e.walkStep += dt / frameDuration;
+        e.walkStep += (speed * dt) / stridePx;
 
         e.thumpCooldown -= dt;
         if (e.thumpCooldown <= 0) {
@@ -348,7 +375,10 @@ export function ElephantWorld() {
     };
 
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      stopRumble();
+    };
   }, [setMode, shake]);
 
   return (
