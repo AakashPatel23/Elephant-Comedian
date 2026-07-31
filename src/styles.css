@@ -68,8 +68,8 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(0.87 0.065 305);
-  --foreground: oklch(0.29 0.08 300);
+  --background: #682860;
+  --foreground: #faf8fa;
   --card: oklch(0.96 0.025 305);
   --card-foreground: oklch(0.29 0.08 300);
   --popover: oklch(0.96 0.025 305);
@@ -105,7 +105,7 @@
 
 .dark {
   --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
+  --foreground: #FAF7FC
   --card: oklch(0.208 0.042 265.755);
   --card-foreground: oklch(0.984 0.003 247.858);
   --popover: oklch(0.208 0.042 265.755);

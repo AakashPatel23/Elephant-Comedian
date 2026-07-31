@@ -16,7 +16,7 @@ import {
   playJokeJingle,
   playRimshot,
   playSit,
-  playStep,
+  playThump,
   playTrumpet,
   playWink,
 } from "@/lib/audio";
@@ -27,12 +27,15 @@ import { SpeechBubble } from "./SpeechBubble";
 const SCALE = 6;
 const SPRITE_W = FRAME_SIZE * SCALE;
 const SPRITE_H = FRAME_SIZE * SCALE;
-const WALK_SPEED = 55;
-const RUN_SPEED = 190;
-const GROUND_OFFSET = 96; // px above the bottom of the viewport
+const WALK_SPEED = 35;
+const RUN_SPEED = 130;
+// The sprite frames have ~6px of transparent padding below the feet (at SCALE 6 that's
+// 36px), so the ground offset is shifted down from the grass line by that much to keep
+// the feet visually planted instead of floating above the grass.
+const GROUND_OFFSET = 60; // px above the bottom of the viewport
 
-const WALK_FRAME_DURATION = 0.16;
-const RUN_FRAME_DURATION = 0.09;
+const WALK_FRAME_DURATION = 0.25;
+const RUN_FRAME_DURATION = 0.13;
 const CLIMB_FRAME_DURATION = 0.12;
 const CLIMB_DURATION = 1.4;
 const CLIMB_HEIGHT = 90;
@@ -41,6 +44,8 @@ const TRUMPET_DURATION = TRUMPET_FRAMES.length * TRUMPET_FRAME_DURATION + 0.7;
 const DAZED_DURATION = 2.4;
 const WINK_HOLD = 0.7;
 const BLINK_HOLD = 0.14;
+const THUMP_MIN_GAP = 7;
+const THUMP_MAX_GAP = 16;
 
 type Mode = "walk" | "run" | "sit" | "climb" | "dazed" | "trumpet" | "joke";
 
@@ -51,7 +56,6 @@ type Engine = {
   mode: Mode;
   timer: number; // seconds left in current mode
   walkStep: number; // fractional index into WALK_FRAMES
-  lastStepFrame: number;
   climbToggle: boolean;
   climbFrameTimer: number;
   trumpetElapsed: number;
@@ -59,6 +63,7 @@ type Engine = {
   blinkHold: number; // seconds left with eyes shut
   winkSide: "left" | "right";
   winkHold: number; // seconds left winking
+  thumpCooldown: number; // seconds until next ambient footstep thump
 };
 
 const PLACEHOLDER_JOKES = [
@@ -90,7 +95,6 @@ export function ElephantWorld() {
     mode: "walk",
     timer: 2,
     walkStep: 0,
-    lastStepFrame: -1,
     climbToggle: false,
     climbFrameTimer: 0,
     trumpetElapsed: 0,
@@ -98,6 +102,7 @@ export function ElephantWorld() {
     blinkHold: 0,
     winkSide: "left",
     winkHold: 0,
+    thumpCooldown: THUMP_MIN_GAP + Math.random() * (THUMP_MAX_GAP - THUMP_MIN_GAP),
   });
 
   const [shakeMode, setShakeMode] = useState<"none" | "normal" | "violent">("none");
@@ -240,10 +245,11 @@ export function ElephantWorld() {
         const frameDuration = e.mode === "run" ? RUN_FRAME_DURATION : WALK_FRAME_DURATION;
         e.x += e.dir * speed * dt;
         e.walkStep += dt / frameDuration;
-        const frameIdx = Math.floor(e.walkStep) % WALK_FRAMES.length;
-        if (frameIdx !== e.lastStepFrame) {
-          e.lastStepFrame = frameIdx;
-          playStep();
+
+        e.thumpCooldown -= dt;
+        if (e.thumpCooldown <= 0) {
+          playThump();
+          e.thumpCooldown = THUMP_MIN_GAP + Math.random() * (THUMP_MAX_GAP - THUMP_MIN_GAP);
         }
 
         if (e.x <= 0 || e.x >= maxX) {
@@ -359,8 +365,10 @@ export function ElephantWorld() {
       <Scenery />
 
       <header className="relative z-10 px-6 pt-8 text-center">
-        <h1 className="font-pixel text-lg text-primary sm:text-2xl">Pixel Elephant Playpen</h1>
-        <p className="mt-3 font-pixel text-[9px] leading-5 text-muted-foreground sm:text-[10px]">
+        <h1 className="font-pixel text-lg text-foreground sm:text-2xl">
+          Elephant Comedian Playpen
+        </h1>
+        <p className="mt-3 font-pixel text-[9px] leading-5 text-foreground/70 sm:text-[10px]">
           click {name} to poke · click the tag to rename
         </p>
       </header>

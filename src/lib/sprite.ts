@@ -33,7 +33,9 @@ function getSheetImage(sheet: Sheet): HTMLImageElement {
 
 export type Sheet = "walk" | "poses";
 
-export const WALK_FRAMES = [0, 1, 2, 3, 4, 5];
+// Frames 0-5 step forward (both the far and near legs now lift, staggered a beat
+// apart); playing them forward then back avoids a hard snap at the loop point.
+export const WALK_FRAMES = [0, 1, 2, 3, 4, 5, 4, 3, 2, 1];
 export const TRUMPET_FRAMES = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
 
 export const POSE_SIT = 0;
@@ -44,16 +46,20 @@ export type EyeState = "open" | "blink" | "wink-left" | "wink-right";
 
 const EYE_LEFT_X = 20;
 const EYE_RIGHT_X = 26;
-const EYE_TOP_Y = 13;
-const EYE_BOTTOM_Y = 14;
+// The open eye art spans rows 13-15 (white sclera on 13, pupil on 14-15); the
+// hand-drawn blink frame (walk sheet frame 6) clears all three rows to body color
+// and draws a single 1px eyelid line on row 14.
+const EYE_SOCKET_TOP_Y = 13;
+const EYE_SOCKET_ROWS = 3;
+const EYE_LID_Y = 14;
 const EYE_W = 3;
 const BODY_COLOR = "#bfd7eb";
 
 function closeEye(ctx: CanvasRenderingContext2D, eyeX: number) {
   ctx.fillStyle = BODY_COLOR;
-  ctx.fillRect(eyeX, EYE_TOP_Y, EYE_W, 1);
+  ctx.fillRect(eyeX, EYE_SOCKET_TOP_Y, EYE_W, EYE_SOCKET_ROWS);
   ctx.fillStyle = "#000000";
-  ctx.fillRect(eyeX, EYE_BOTTOM_Y, EYE_W, 1);
+  ctx.fillRect(eyeX, EYE_LID_Y, EYE_W, 1);
 }
 
 export function drawElephant(

@@ -137,8 +137,20 @@ export function playClimbFail() {
   osc.stop(t + 0.4);
 }
 
-export function playStep() {
-  tone(220, 0, 0.04, "square", 0.04);
+/** Occasional heavy footstep thump while walking/running. */
+export function playThump() {
+  const a = ac();
+  const osc = a.createOscillator();
+  const g = a.createGain();
+  const t = a.currentTime;
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(90, t);
+  osc.frequency.exponentialRampToValueAtTime(45, t + 0.18);
+  g.gain.setValueAtTime(0.22, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+  osc.connect(g).connect(a.destination);
+  osc.start(t);
+  osc.stop(t + 0.25);
 }
 
 /** Chiptune fanfare before a joke. */

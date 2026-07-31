@@ -18,7 +18,7 @@ function Tree({ left, scale }: { left: string; scale: number }) {
   );
 }
 
-/** Grass, a couple of pixel trees, and a playpen fence along the ground and side edges. */
+/** Grass, a couple of pixel trees, and playpen fence posts along the side edges. */
 export function Scenery() {
   return (
     <>
@@ -27,16 +27,6 @@ export function Scenery() {
       {TREES.map((t) => (
         <Tree key={t.left} {...t} />
       ))}
-
-      {/* fence rail along the top of the grass */}
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-24 h-4"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(to right, #8b5e34 0 6px, transparent 6px 16px)",
-        }}
-      />
-      <div className="pointer-events-none absolute inset-x-0 bottom-[6.75rem] h-1 bg-[#6b4423]" />
 
       {/* side fence posts, where the elephant bonks/climbs */}
       <div
