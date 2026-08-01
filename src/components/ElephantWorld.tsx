@@ -119,9 +119,11 @@ export function ElephantWorld() {
   const [joke, setJoke] = useState<string | null>(null);
   const [jokeLoading, setJokeLoading] = useState(false);
   const [name, setName] = useState("Peanut");
+  // Mirrors whether pendingPunchline is set, just so the joke button's label can react to it.
+  const [awaitingPunchline, setAwaitingPunchline] = useState(false);
   const recentJokes = useRef<(typeof PLACEHOLDER_JOKES)[number][]>([]);
-  // Set once the setup has finished typing; a poke while this is set reveals the
-  // punchline instead of rolling a new random reaction.
+  // Set once the setup has finished typing; pressing the joke button again while this is
+  // set reveals the punchline instead of rolling a new joke.
   const pendingPunchline = useRef<(typeof PLACEHOLDER_JOKES)[number] | null>(null);
 
   // ---- persistence -------------------------------------------------
@@ -190,11 +192,11 @@ export function ElephantWorld() {
     const pick = options[Math.floor(Math.random() * options.length)];
     recentJokes.current.push(pick);
 
-    // wait a beat before the setup appears, then wait for a poke to reveal the punchline
+    // wait a beat before the setup appears, then wait for "Punch me!" to reveal the punchline
     window.setTimeout(() => {
       typeOut("", pick.setup, () => {
         pendingPunchline.current = pick;
-        setJoke((prev) => `${prev ?? ""} ▸`);
+        setAwaitingPunchline(true);
       });
     }, 400);
   }, [jokeLoading, typeOut]);
@@ -214,18 +216,10 @@ export function ElephantWorld() {
   );
 
   // ---- click interaction ---------------------------------------------
-  // Poking the elephant no longer starts a joke (that's the "Joke me!" button's job) -
-  // it only reveals a pending punchline, or otherwise triggers sit/run/trumpet.
+  // Poking the elephant never touches jokes - it only triggers sit/run/trumpet. Jokes
+  // live entirely on the "Joke me!" / "Punch me!" button below.
   const onPoke = useCallback(() => {
     const e = engine.current;
-
-    if (pendingPunchline.current) {
-      const pick = pendingPunchline.current;
-      pendingPunchline.current = null;
-      revealPunchline(pick);
-      return;
-    }
-
     if (e.mode === "dazed" || e.mode === "climb" || e.mode === "joke" || jokeLoading) return;
 
     const roll = Math.floor(Math.random() * 3);
@@ -237,19 +231,29 @@ export function ElephantWorld() {
       setMode("trumpet", TRUMPET_DURATION);
       playTrumpet();
     }
-  }, [doSit, jokeLoading, revealPunchline, setMode]);
+  }, [doSit, jokeLoading, setMode]);
 
   const onJokeButtonClick = useCallback(() => {
     const e = engine.current;
+
+    if (pendingPunchline.current) {
+      const pick = pendingPunchline.current;
+      pendingPunchline.current = null;
+      setAwaitingPunchline(false);
+      revealPunchline(pick);
+      return;
+    }
+
     if (e.mode === "dazed" || e.mode === "climb" || jokeLoading) return;
     doJoke();
-  }, [doJoke, jokeLoading]);
+  }, [doJoke, jokeLoading, revealPunchline]);
 
   // ---- secret easter egg -----------------------------------------------
   const triggerSpecial = useCallback(() => {
     const e = engine.current;
     // interrupt any joke in progress so the sequence doesn't collide with it
     pendingPunchline.current = null;
+    setAwaitingPunchline(false);
     setJoke(null);
     setJokeLoading(false);
 
@@ -416,8 +420,8 @@ export function ElephantWorld() {
           Elephant Comedian Playpen
         </h1>
         <p className="mt-3 font-pixel text-[9px] leading-5 text-foreground/70 sm:text-[10px]">
-          click {name} to poke · Joke me! for a joke, then click {name} for the punchline · click
-          the tag to rename
+          click {name} to poke · Joke me! for a joke, then Punch me! for the punchline · click the
+          tag to rename
         </p>
       </header>
 
@@ -425,10 +429,10 @@ export function ElephantWorld() {
         <button
           type="button"
           onClick={onJokeButtonClick}
-          disabled={jokeLoading}
+          disabled={jokeLoading && !awaitingPunchline}
           className="rounded-md border-2 border-foreground bg-card px-4 py-2 font-pixel text-[10px] text-card-foreground shadow-[3px_3px_0_0_var(--color-foreground)] transition-transform hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-50"
         >
-          Joke me!
+          {awaitingPunchline ? "Punch me!" : "Joke me!"}
         </button>
       </div>
 
